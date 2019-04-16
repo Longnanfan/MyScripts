@@ -8,12 +8,29 @@ Return, chain
 END
 
 
+
+
+FUNCTION Get_Contour, density, percentile = percentile
+
+; 这里的 percentile 要按照从大到小的顺序
+
+IF N_Elements(percentile) EQ 0 THEN percentile = [0.84, 0.50, 0.16]
+percentile = 1 - percentile
+temp_ = density[Sort(density)]
+tempC = Total(temp_, /Cumulative)
+inds = Value_Locate(tempC, percentile)
+vals = temp_[inds]
+Return, vals
+END
+
+
+
+
 PRO MCMC_Corner_Map
 
 chain = Get_Data()
 
 keys = ["a", "b", "c", "d"]
-
 
 nbins = 10
 pos = [0.15, 0.1, 0.99, 0.99]
@@ -75,13 +92,23 @@ FOR j = 0, N_Elements(keys) - 1, 1 DO BEGIN
     ENDIF
     
     IF i + j LT N_Elements(keys) - 1 THEN BEGIN
-        density = Hist_2D(x, y, Bin1 = (Max(x)-Min(x))/25.0, Bin2 = (Max(y)-Min(y))/25.0)
-        density = BytSCL(density)
-        cgImage, density, Position = rect, /NoErase, XRange = [Min(x), Max(x)], YRange = [Min(y), Max(y)]
+        ;--------------------------------------------------------------------v
+        xbinsize = (Max(x)-Min(x))/25.0
+        ybinsize = (Max(y)-Min(y))/25.0
+        density = Hist_2D(x, y, Bin1 = xbinsize, Bin2 = ybinsize) / Double(N_Elements(x))
+        ;--------------------------------------------------------------------^
+        
+        cgImage, BytSCL(density), Position = rect, /NoErase, XRange = [Min(x), Max(x)], YRange = [Min(y), Max(y)]
+        
+        ;--------------------------------------------------------------------v
+        cgContour, density, Position = rect, /NoErase, XStyle = 1+4, YStyle = 1+4, Levels = Get_Contour(density, percentile = [0.84, 0.50, 0.16]), $
+                   Label = 0, C_Colors = cgColor("Red")
+        ;--------------------------------------------------------------------^
         
         cgPlot, x, y, /NoData, Position = rect, /NoErase, XRange = [Min(x), Max(x)], YRange = [Min(y), Max(y)], XStyle = 1, YStyle = 1, $
                 XTickS = 2, XTickV = [-3, 0, 3], XTickName = Replicate(" ", 3), XMinor = 5, $
                 YTickS = 2, YTickV = [-3, 0, 3], YTickName = Replicate(" ", 3), YMinor = 5
+        
                 
         IF i EQ 0 THEN BEGIN
             cgPlot, x, y, /NoData, Position = rect, /NoErase, XRange = [Min(x), Max(x)], YRange = [Min(y), Max(y)], XStyle = 1, YStyle = 1, $
